@@ -102,6 +102,7 @@ void EdgeUpdateManager::receiveEdgeUpdates(std::unique_ptr<EdgeUpdateBatch> edge
 
 void EdgeUpdateManager::hostCudaAllocConcurrentUpdates()
 {
+	/// cudaHostAlloc?Allocates page-locked memory on the host.
 	HANDLE_ERROR(cudaHostAlloc((void **)&(updates_insertion->raw_edge_update), updates_insertion->edge_update.size() * sizeof(EdgeUpdate), cudaHostAllocDefault));
 	HANDLE_ERROR(cudaHostAlloc((void **)&(updates_deletion->raw_edge_update), updates_deletion->edge_update.size() * sizeof(EdgeUpdate), cudaHostAllocDefault));
 }
