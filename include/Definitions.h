@@ -124,3 +124,4 @@ const int32_t EDGEBLOCKSIZE = 64;
 //------------------------------------------------------------------------------
 //#define DEBUG_VERBOSE_OUPUT
 //#define ACCESS_METRICS
+//#define DEBUG_EDGEINSERTION
