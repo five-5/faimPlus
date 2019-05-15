@@ -40,10 +40,14 @@ struct EdgeDataSOA  // 未使用
 struct EdgeUpdate
 {
 	vertex_t source;
-	EdgeData update;
-	friend __host__ __device__ bool operator<(const EdgeDataUpdate &lhs, const EdgeDataUpdate &rhs)
-	{
-		return ((lhs.source < rhs.source) || (lhs.source == rhs.source && (lhs.update < rhs.update)));
+  	EdgeData update;
+  	index_t neighbor;
+	friend __host__ __device__ bool operator<(const EdgeDataUpdate &lhs, const EdgeDataUpdate &rhs) 
+	{ 
+		if (lhs.neighbor == rhs.neighbor) {
+		return ((lhs.source > rhs.source) || (lhs.source == rhs.source && !(lhs.update < rhs.update)));
+		}
+		return lhs.neighbor > rhs.neighbor;
 	}
 };
 
