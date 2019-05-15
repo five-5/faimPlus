@@ -45,7 +45,7 @@ struct EdgeUpdate
 	friend __host__ __device__ bool operator<(const EdgeDataUpdate &lhs, const EdgeDataUpdate &rhs) 
 	{ 
 		if (lhs.neighbor == rhs.neighbor) {
-		return ((lhs.source > rhs.source) || (lhs.source == rhs.source && !(lhs.update < rhs.update)));
+		return ((lhs.source > rhs.source) || (lhs.source == rhs.source && (lhs.update < rhs.update)));
 		}
 		return lhs.neighbor > rhs.neighbor;
 	}
