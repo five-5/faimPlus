@@ -73,6 +73,37 @@ __forceinline__ __device__ void setAdjacency(EdgeData* edge_data, vertex_t* adja
 	edge_data->destination = adjacency[index];
 }
 
+//------------------------------------------------------------------------------
+// Update Adjacency
+//------------------------------------------------------------------------------
+//
+
+//------------------------------------------------------------------------------
+//
+template <typename EdgeDataType>
+__forceinline__ __device__ void updateAdjacency(EdgeDataType* edge_data, EdgeDataType& update_data, vertex_t edges_per_page)
+{
+  *edge_data = update_data;
+}
+
+template <typename EdgeDataType>
+__forceinline__ __device__ void updateAdjacency(EdgeDataType* edge_data, EdgeDataType* update_data, vertex_t edges_per_page)
+{
+  *edge_data = *update_data;
+}
+
+template <typename EdgeDataType, typename UpdateDataType>
+__forceinline__ __device__ void updateAdjacency(EdgeDataType* edge_data, UpdateDataType& update_data, vertex_t edges_per_page)
+{
+	*edge_data = update_data.update;
+}
+
+template <typename EdgeDataType, typename UpdateDataType>
+__forceinline__ __device__ void updateAdjacency(EdgeDataType* edge_data, UpdateDataType* update_data, vertex_t edges_per_page)
+{
+	*edge_data = update_data->update;
+}
+
 
 //------------------------------------------------------------------------------
 // Set DeletionMarker
@@ -132,9 +163,8 @@ __forceinline__ __device__ index_t* getBlockIndex(IteratorDataType* adjacency, i
 
 
 //------------------------------------------------------------------------------
-// Get PageIndex when pointer is on page start
+// Get next PageIndex when pointer is on page start
 //
-
 template <typename IteratorDataType>
 __forceinline__ __device__ index_t* getBlockIndexAbsolute(IteratorDataType* adjacency, int numbers_per_page)
 {
@@ -341,6 +371,7 @@ public:
 		}
 	}
 
+	/// move to corresponding index
 	__forceinline__ __device__ void advanceIteratorToIndex(vertex_t& edges_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, index_t& edge_block_index, vertex_t& shuffle_index)
 	{
 		while (shuffle_index >= edges_per_page)
@@ -352,6 +383,7 @@ public:
 		}
 	}
 
+	/// shuffle_index destination index position
 	__forceinline__ __device__ void advanceIteratorToIndex(vertex_t& edges_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, vertex_t& shuffle_index, int& neighbours, int& capacity)
 	{
 		while (shuffle_index > edges_per_page)
@@ -578,3 +610,34 @@ public:
 protected:
 	index_t* iterator;
 };
+
+//------------------------------------------------------------------------------
+// d_binarySearch
+__forceinline__ __device__ void d_binarySearch(EdgeUpdate* edge_update_data, index_t search_element, index_t start_index, int number_updates, index_t* deletion_helper)
+{
+  int lower_bound = start_index;
+  int upper_bound = start_index + (number_updates - 1);
+  index_t search_index;
+  while (lower_bound <= upper_bound)
+  {
+    search_index = lower_bound + ((upper_bound - lower_bound) / 2);
+    index_t update = edge_update_data[search_index].update.destination;
+
+    // First check if we get a hit
+    if (update == search_element)
+    {
+      // We have a duplicate, let's mark it for deletion and then finish
+      deletion_helper[search_index] = DELETIONMARKER;
+      break;
+    }
+    else if (update < search_element)
+    {
+      lower_bound = search_index + 1;
+    }
+    else
+    {
+      upper_bound = search_index - 1;
+    }
+  }
+  return;
+}

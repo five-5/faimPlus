@@ -43,34 +43,18 @@ public:
 	EdgeUpdate* raw_edge_update;
 
 	// Device side
-	EdgeUpdate* d_edge_update;
+	EdgeUpdate* d_edge_update;  
 };
 
-
-
-/// Modify:@SH change vertex_neighbour to workitem
-//typedef struct vertex_neighbour workitem;
+/*
+ * update work balance helper struct
+*/
 struct workitem {
 	index_t index;
 	index_t neighbour;
-	/// Add:@SH add page_num attribute
-	index_t page_num;
-	index_t off;
-	__host__ __device__ workitem() { index = DELETIONMARKER; neighbour = 0; page_num = 0; off = 0; }
-	__host__ __device__ workitem(int x) { page_num = x; }
-	__host__ __device__ workitem(int x, int y, int t, int off) :index(x), neighbour(y), page_num(t), off(off) {}
-	__host__ __device__ workitem(const workitem& w) { index = w.index; neighbour = w.neighbour; page_num = w.page_num; off = w.off; }
+	index_t off;			// update data off
 
-	/*friend __host__ __device__ bool operator<(const vertex_neighbour &lhs, const vertex_neighbour &rhs)
-
-	{
-	return ((lhs.neighbour < rhs.neighbour));
-	}*/
-	// Modify:@SH change the process logic 
-	friend __host__ __device__ workitem operator+(const workitem &lhs, const workitem &rhs)
-	{
-		return workitem(rhs.index, rhs.neighbour, rhs.page_num + lhs.page_num, rhs.off);
-	}
+	__host__ __device__ workitem() { index = DELETIONMARKER; neighbour = 0; off = 0;}
 };
 
 /*! \class EdgeUpdatePreProcessing
