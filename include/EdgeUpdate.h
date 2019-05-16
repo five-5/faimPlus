@@ -70,13 +70,9 @@ public:
 		temp_memory_dispenser.getTemporaryMemory<EdgeUpdate>(batch_size); // Move after update data
 
 																			  // Now let's set the member pointers
-		d_edge_src_counter = temp_memory_dispenser.getTemporaryMemory<index_t>(number_vertices + 1);
-		d_update_src_offsets = temp_memory_dispenser.getTemporaryMemory<index_t>(number_vertices + 1);
 		d_different_vertexes = temp_memory_dispenser.getTemporaryMemory<workitem>(number_vertices + 1);
 	}
 
-	index_t* d_edge_src_counter;
-	index_t* d_update_src_offsets;
 	workitem* d_different_vertexes;
 };
 

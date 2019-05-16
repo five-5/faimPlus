@@ -45,27 +45,6 @@ __global__ void d_setupneighbor(memory_t* memory,EdgeUpdate* edge_update_data,
 }
 
 //------------------------------------------------------------------------------
-// @SH Counts the number of updates per src index
-__global__ void d_updateInstanceCounter(EdgeUpdate* edge_update_data,
-  index_t* edge_src_counter,
-  int number_vertices,
-  int batch_size)
-{
-  int tid = threadIdx.x + blockIdx.x*blockDim.x;
-  if (tid >= batch_size)
-    return;
-
-  index_t edge_src = edge_update_data[tid].source;
-
-  if (edge_src >= number_vertices)
-    return;
-
-  atomicAdd(&(edge_src_counter[edge_src]), 1);
-
-  return;
-}
-
-//------------------------------------------------------------------------------
 // @SH set 1 to every first different update source corresponding position
 __global__ void d_setupscanhelper(UpdateData* edge_update_data,
   int batch_size, 
@@ -235,7 +214,7 @@ void EdgeUpdateManager::setupPhrase(std::unique_ptr<MemoryManager>& memory_manag
 }
 
 //------------------------------------------------------------------------------
-// @SH edgeUpdatePreprocessing: allocate update_src,update_off,workitem + set update_src and update_off
+// @SH edgeUpdatePreprocessing: allocate workitem 
 std::unique_ptr<EdgeUpdatePreProcessing> EdgeUpdateManager::edgeUpdatePreprocessing(std::unique_ptr<MemoryManager>& memory_manager,
   const std::shared_ptr<Config>& config)
 {
@@ -245,31 +224,12 @@ std::unique_ptr<EdgeUpdatePreProcessing> EdgeUpdateManager::edgeUpdatePreprocess
     memory_manager,
     static_cast<size_t>(sizeof(VertexData)));   
 
-  int batch_size = updates->edge_update.size();
-  int block_size = config->testruns_.at(config->testrun_index_)->params->init_launch_block_size_;
-  int grid_size = (batch_size / block_size) + 1;
-
-  HANDLE_ERROR(cudaMemset(preprocessed->d_edge_src_counter,
-    0,
-    sizeof(index_t) * memory_manager->next_free_vertex_index));
-
-  // Count instances of edge updates
-  d_updateInstanceCounter << < grid_size, block_size >> > (updates->d_edge_update,
-    preprocessed->d_edge_src_counter,
-    memory_manager->next_free_vertex_index,
-    batch_size);
-
-  // Prefix Sum Scan on d_edge_src_counter to get number of updates per vertex
-  thrust::device_ptr<index_t> th_edge_src_counter(preprocessed->d_edge_src_counter);
-  thrust::device_ptr<index_t> th_update_src_offsets(preprocessed->d_update_src_offsets);
-  thrust::exclusive_scan(th_edge_src_counter, th_edge_src_counter + memory_manager->next_free_vertex_index + 1, th_update_src_offsets);
-
   return std::move(preprocessed);
 }
 
 //------------------------------------------------------------------------------
 // @SH setupscanhelper: set scanhelper with 1 in every first different update source corresponding position
-void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::setupscanhelper(std::unique_ptr<MemoryManager>& memory_manager, int batch_size, index_t* scanhelper) 
+void EdgeUpdateManager::setupscanhelper(std::unique_ptr<MemoryManager>& memory_manager, int batch_size, index_t* scanhelper) 
 {
   int block_size = 256;
   int grid_size = batch_size / block_size + 1;
@@ -280,9 +240,9 @@ void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::setupscanh
 
 //------------------------------------------------------------------------------
 // @SH updateWorkItem: set workitem and thl_n thm_n th0
-void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::updateWorkItem(std::unique_ptr<MemoryManager>& memory_manager,
+void EdgeUpdateManager::updateWorkItem(std::unique_ptr<MemoryManager>& memory_manager,
   const std::shared_ptr<Config>& config,
-  const std::unique_ptr<EdgeUpdatePreProcessing<UpdateDataType>>& preprocessed,
+  const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed,
   index_t* scanhelper,
   index_t* thm,
   index_t* ths,
@@ -314,7 +274,7 @@ void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::updateWork
 
 //------------------------------------------------------------------------------
 // @SH edgeUpdateDuplicateCheckingByBlocksize: check duplicate in batch and adjacency
-void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<MemoryManager>& memory_manager,
+void EdgeUpdateManager::edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<MemoryManager>& memory_manager,
   const std::shared_ptr<Config>& config,
   const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed, 
   index_t* d_pageindex, 

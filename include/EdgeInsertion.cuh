@@ -227,7 +227,7 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 		time_setup += time_diff;
 
 		/// 2. construct and set update data related data
-		/// 2.1 edgeUpdatePreprocessing: allocate update_src,update_off,workitem + set update_src and update_off
+		/// 2.1 edgeUpdatePreprocessing: allocate workitem 
 		printf("Preprocessing\n");
 		start_clock(in_start, in_stop);
 			auto preprocessed = edgeUpdatePreprocessing(memory_manager, config);  /// include thrust::exclusive_scan
@@ -239,7 +239,7 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 		
 		/// @SH feel the old's logic have some problems so I fix it as follows
 		/// allocate and set workitem related data
-		TemporaryMemoryAccessHeap temp_memory_dispenser_for_insertion(memory_manager.get(), memory_manager->next_free_vertex_index * 4 + batch_size, sizeof(VertexData));
+		TemporaryMemoryAccessHeap temp_memory_dispenser_for_insertion(memory_manager.get(), memory_manager->next_free_vertex_index + 1 + batch_size, sizeof(VertexData));
 		
 		index_t* scanhelper = temp_memory_dispenser_for_insertion.getTemporaryMemory<index_t>(batch_size + 1);
 		index_t* thm = temp_memory_dispenser_for_insertion.getTemporaryMemory<index_t>(1);
