@@ -98,6 +98,8 @@ namespace faimGraphEdgeInsertion
 #endif
 	}
 
+	//------------------------------------------------------------------------------
+	// d_calcPageindexCapacity
 	__forceinline__ __device__ index_t d_calcPageindexCapacity(vertex_t capacity, vertex_t edges_per_page, vertex_t pageindexes_per_page,)
 	{
 		return ( capacity / edges_per_page + pageindexes_per_page - 1 ) / pageindexes_per_page * pageindexes_per_page;
