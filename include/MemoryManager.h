@@ -42,6 +42,13 @@ enum class ErrorCode : unsigned int
 	UNKNOWN_ERROR = 0xFFFFFFFF
 };
 
+/// @SH
+enum class PAGETYPE
+{
+	ADJACENCY,
+	PAGEINDEX
+};
+
 //------------------------------------------------------------------------------
 //
 /*! \class MemoryManager

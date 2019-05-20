@@ -60,7 +60,7 @@ namespace faimGraphGeneral
 
 		neighbours[tid] = vertices_in_adjacency;
 		block_requirements[tid] = number_blocks;
-		pageindex_requirements[tid] = (vertex_t)ceil((float)(number_blocks * MEMORYOVERALLOCATION) / (float)(memory_manager->edges_per_page));
+		pageindex_requirements[tid] = (vertex_t)ceil((float)(number_blocks * MEMORYOVERALLOCATION) / (float)(memory_manager->pageindexes_per_page));
 
 		return;
 	}

@@ -29,7 +29,8 @@ namespace faimGraphEdgeInsertion
 	__global__ void d_get_pageindex_off (memory_t* memory,
 		int valid_size,
 		vertex_t pageindexes_per_page,
-		index_t* pageindex_off) {
+		index_t* pageindex_off) 
+	{
 		
 		int tid = threadIdx.x + blockIdx.x*blockDim.x;
 		if (tid >= valid_size) {
@@ -48,7 +49,8 @@ namespace faimGraphEdgeInsertion
 											int valid_size,
 											vertex_t pageindexes_per_page,
 											index_t* pageindex,
-											index_t* pageindex_off){
+											index_t* pageindex_off)
+	{
 
 		int tid = threadIdx.x + blockIdx.x*blockDim.x;
 		if (tid >= valid_size) {
@@ -68,7 +70,41 @@ namespace faimGraphEdgeInsertion
 	}
 
 	//------------------------------------------------------------------------------
-	// 
+	// d_pageAllocate
+	__forceinline__ __device__ void d_pageAllocate(MemoryManager* memory_manager, index_t* edge_block_index_ptr, PAGETYPE type)
+	{
+		index_t edge_block_index;
+#ifdef QUEUING			/// define in EdgeUpdate.h
+				if (memory_manager->d_page_queue.dequeue(edge_block_index))
+				{
+					// We got something from the queue
+					*edge_block_index_ptr = edge_block_index;
+				}
+				else
+				{
+#endif
+					// Queue is currently empty
+					if (type == PAGETYPE::ADJACENCY) {
+						*edge_block_index_ptr = atomicAdd(&(memory_manager->next_free_page), 1);						
+					} else if (type == PAGETYPE::PAGEINDEX) {
+						*edge_block_index_ptr = atomicAdd(&(memory_manager->next_free_pageindex_page), 1);		
+					}
+#ifdef ACCESS_METRICS
+					atomicAdd(&(memory_manager->access_counter), 1);
+#endif
+
+#ifdef QUEUING
+				}
+#endif
+	}
+
+	__forceinline__ __device__ index_t d_calcPageindexCapacity(vertex_t capacity, vertex_t edges_per_page, vertex_t pageindexes_per_page,)
+	{
+		return ( capacity / edges_per_page + pageindexes_per_page - 1 ) / pageindexes_per_page * pageindexes_per_page;
+	}
+
+	//------------------------------------------------------------------------------
+	// edgeInsertionVertexCentric
 	__global__ void d_edgeInsertionVertexCentric(MemoryManager* memory_manager,
 		memory_t* memory,
 		int page_size,
@@ -90,15 +126,26 @@ namespace faimGraphEdgeInsertion
 		// Gather pointer
 		index_t src = work[tid].index;
 		vertex_t edges_per_page = memory_manager->edges_per_page;
+		vertex_t pageindexes_per_page = memory_manager->pageindexes_per_page;
 		EdgeUpdate* vertices = (EdgeUpdate*)memory;
 		int neighbours = vertices[src].neighbours;
 		int capacity = vertices[src].capacity;
+		int pageindex_numbers = neighbours / edges_per_page;
+		int pageindex_capacity = d_calcPageindexCapacity(capacity, edges_per_page, pageindexes_per_page);
 
-		AdjacencyIterator adjacency_iterator(pageAccess<EdgeData>(memory, vertices[src].mem_index, page_size, memory_manager->start_index));
+		
+		PageIndexIterator pageindex_iterator(pageAccess<EdgeData>(memory, vertices[src].mem_index, page_size, memory_manager->start_page_index));
+		index_t fresh_pageindex_position = pageindex_numbers;
+		index_t fresh_position = neighbours - (pageindex_numbers - 1) * edges_per_page;
+		
+		/// TODO: to check the index whether need to sub one
+		/// 1.1 pageindex iterator at  
+		index_t adjacency_pageindex = pageindex_iterator.at(fresh_pageindex_position - 1, memory, page_size, memory_manager->start_page_index, pageindexes_per_page);
 
-		index_t fresh_position = neighbours;
-		/// TODO: advanceIteratorToIndex函数待修改
-		adjacency_iterator.advanceIteratorToIndex(edges_per_page, memory, page_size, memory_manager->start_index, fresh_position, neighbours, capacity);
+		/// 1.2 set adjacency_iterator to the last item in last page
+		AdjacencyIterator adjacency_iterator(pageAccess<EdgeData>(memory, adjacency_pageindex, page_size, memory_manager->start_index));
+		adjacency_iterator.advanceIteratorToIndexAbsolute(edges_per_page, memory, page_size, memory_manager->start_index, fresh_position, fresh_position, edges_per_page);
+		
 		while (true)
 		{
 			/// full of the page and stop go next
@@ -124,12 +171,21 @@ namespace faimGraphEdgeInsertion
 				vertices[src].neighbours = neighbours;
 				vertices[src].capacity = capacity;
 #ifdef CLEAN_PAGE      /// define in EdgeUpdate.h
+				int number_pageindexes =  neighbours / edges_per_page;
 				while (neighbours < capacity)
 				{
 					// Set the rest of the new block to DELETIONMARKERS
 					setDeletionMarker(adjacency_iterator.getIterator(), edges_per_page);
 					++adjacency_iterator;
-					++neighbours;
+					++neighbours;              
+				}
+				
+				/// set the rest of the pageindex to DELETIONMARKERS
+				while (number_pageindexes < d_calcPageindexCapacity(capacity, edges_per_page, pageindexes_per_page))
+				{
+					(index_t)*pageindex_iterator = DELETIONMARKER;
+					++pageindex_iterator;
+					++number_pageindexes;
 				}
 #endif
 				break;
@@ -138,28 +194,22 @@ namespace faimGraphEdgeInsertion
 			{
 				// We need to get a new page and start all over again
 				// Set index to next block and then reset adjacency list
-				index_t edge_block_index;
+				
+				/// return (index_t*)it
 				index_t* edge_block_index_ptr = adjacency_iterator.getPageIndexPtr(edges_per_page);
-#ifdef QUEUING			/// define in EdgeUpdate.h
-				if (memory_manager->d_page_queue.dequeue(edge_block_index))
-				{
-					// We got something from the queue
-					*edge_block_index_ptr = edge_block_index;
-				}
-				else
-				{
-#endif
-					// Queue is currently empty
-					*edge_block_index_ptr = atomicAdd(&(memory_manager->next_free_page), 1);
-#ifdef ACCESS_METRICS
-					atomicAdd(&(memory_manager->access_counter), 1);
-#endif
-
-#ifdef QUEUING
-				}
-#endif
-				adjacency_iterator.setIterator(pageAccess<EdgeDataType>(memory, *edge_block_index_ptr, page_size, memory_manager->start_index));
+				d_pageAllocate(memory_manager, edge_block_index_ptr, PAGETYPE::ADJACENCY);
+				adjacency_iterator.setIterator(pageAccess<EdgeData>(memory, *edge_block_index_ptr, page_size, memory_manager->start_index));
 				capacity += edges_per_page;
+
+				if (pageindex_iterator.pageIsFull()) {
+					
+					index_t* pageindex_block_index_ptr = pageindex_iterator.getPageIndexPtr(pageindexes_per_page);
+					d_pageAllocate(memory_manager, edge_block_index_ptr, PAGETYPE::PAGEINDEX);
+					pageindex_iterator.setIterator(pageAccess<index_t>(memory, *pageindex_block_index_ptr, page_size, memory_manager->start_page_index));
+				} else {
+					*pageindex_iterator = *edge_block_index_ptr;
+					++pageindex_iterator;
+				}
 			}
 		}
 
@@ -230,7 +280,10 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 		/// 2.1 edgeUpdatePreprocessing: allocate workitem 
 		printf("Preprocessing\n");
 		start_clock(in_start, in_stop);
-			auto preprocessed = edgeUpdatePreprocessing(memory_manager, config);  /// include thrust::exclusive_scan
+			auto preprocessed = std::make_unique<EdgeUpdatePreProcessing>(static_cast<uint32_t>(memory_manager->next_free_vertex_index),
+			static_cast<vertex_t>(updates->edge_update.size()),
+			memory_manager,
+			static_cast<size_t>(sizeof(VertexData)));  
 		time_diff = end_clock(in_start, in_stop);
 		time_preprocess += time_diff;
 

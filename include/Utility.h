@@ -383,8 +383,8 @@ public:
 		}
 	}
 
-	/// shuffle_index destination index position
-	__forceinline__ __device__ void advanceIteratorToIndex(vertex_t& edges_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, vertex_t& shuffle_index, int& neighbours, int& capacity)
+	/// shuffle_index destination index position √
+	__forceinline__ __device__ void advanceIteratorToIndexAbsolute(vertex_t& edges_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, vertex_t& shuffle_index, int& neighbours, int& capacity)
 	{
 		while (shuffle_index > edges_per_page)
 		{
@@ -397,7 +397,7 @@ public:
 			iterator += edges_per_page;
 			pointerHandlingTraverse(iterator, memory, page_size, edges_per_page, start_index);
 		}
-		else
+		else   /// neighbours == capacity
 		{
 			iterator += shuffle_index;
 		}
@@ -463,6 +463,10 @@ public:
 	__forceinline__ __device__ PageIndexIterator& operator++() { ++iterator; return *this; }
 
 	__forceinline__ __device__ PageIndexIterator operator++(int) { PageIndexIterator result(*this); ++iterator; return result; }
+
+	__forceinline__ __device__ PageIndexIterator& operator--() { --iterator; return *this; }
+
+	__forceinline__ __device__ PageIndexIterator operator--(int) { PageIndexIterator result(*this); --iterator; return result; }
 
 	__forceinline__ __device__ PageIndexIterator& operator+=(int pageindexes_per_page) { iterator += pageindexes_per_page; return *this; }
 
@@ -588,18 +592,18 @@ public:
 		}
 	}
 
-	__forceinline__ __device__ void advanceIteratorToIndex(vertex_t& edges_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, vertex_t& shuffle_index, int& neighbours, int& capacity)
+	__forceinline__ __device__ void advanceIteratorToIndexAbsolute(vertex_t& pageindexes_per_page, memory_t*& memory, int& page_size, uint64_t& start_index, vertex_t& shuffle_index, int& neighbours, int& capacity)
 	{
-		while (shuffle_index > edges_per_page)
+		while (shuffle_index > pageindexes_per_page)
 		{
-			iterator += edges_per_page;
-			pointerHandlingTraverse(iterator, memory, page_size, edges_per_page, start_index);
-			shuffle_index -= edges_per_page;
+			iterator += pageindexes_per_page;
+			pointerHandlingTraverse(iterator, memory, page_size, pageindexes_per_page, start_index);
+			shuffle_index -= pageindexes_per_page;
 		}
-		if (shuffle_index == edges_per_page && neighbours < capacity)
+		if (shuffle_index == pageindexes_per_page && neighbours < capacity)
 		{
-			iterator += edges_per_page;
-			pointerHandlingTraverse(iterator, memory, page_size, edges_per_page, start_index);
+			iterator += pageindexes_per_page;
+			pointerHandlingTraverse(iterator, memory, page_size, pageindexes_per_page, start_index);
 		}
 		else
 		{

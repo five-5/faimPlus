@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <climits>
+#include <algorithm>
 #include "faimGraph.h"
 #include "EdgeUpdate.h"
 #include "MemoryManager.h"
@@ -208,23 +209,17 @@ void EdgeUpdateManager::setupPhrase(std::unique_ptr<MemoryManager>& memory_manag
     updates->d_edge_update, 
     batch_size);
 
-  // thrust sort
-  thrust::device_ptr<EdgeUpdate> th_edge_updates(updates->d_edge_update);
-  thrust::sort(th_edge_updates, th_edge_updates + batch_size);   /// neighbor decreasing order source decreasing order destination increasing order
-}
-
-//------------------------------------------------------------------------------
-// @SH edgeUpdatePreprocessing: allocate workitem 
-std::unique_ptr<EdgeUpdatePreProcessing> EdgeUpdateManager::edgeUpdatePreprocessing(std::unique_ptr<MemoryManager>& memory_manager,
-  const std::shared_ptr<Config>& config)
-{
-  /// allocate update_src,update_off,workitem
-  std::unique_ptr<EdgeUpdatePreProcessing> preprocessed = std::make_unique<EdgeUpdatePreProcessing>(static_cast<uint32_t>(memory_manager->next_free_vertex_index),
-    static_cast<vertex_t>(updates->edge_update.size()),
-    memory_manager,
-    static_cast<size_t>(sizeof(VertexData)));   
-
-  return std::move(preprocessed);
+  if (batch_size <= 100000) {
+    std::sort(updates->edge_update.begin(),updates->edge_update.end());
+    HANDLE_ERROR(cudaMemcpy(updates->d_edge_update,
+      updates->edge_update.data(),
+      sizeof(UpdateData) * batch_size,
+      cudaMemcpyHostToDevice));
+  } else {
+    // thrust sort
+    thrust::device_ptr<EdgeUpdate> th_edge_updates(updates->d_edge_update);
+    thrust::sort(th_edge_updates, th_edge_updates + batch_size);   /// neighbor decreasing order source decreasing order destination increasing order
+  }
 }
 
 //------------------------------------------------------------------------------
