@@ -22,6 +22,17 @@
 #include "Definitions.h"
 #define SHAREDSIZE 100
 
+struct sortf{
+  __host__ __device__
+  bool operator() (const EdgeUpdate& lhs, const EdgeUpdate& rhs){
+           if (lhs.neighbor == rhs.neighbor){
+               if (lhs.source == rhs.source ){return lhs.update.destination < rhs.update.destination;}
+           return lhs.source < rhs.source;
+          }
+          return lhs.neighbor < rhs.neighbor;
+   
+      }
+  };
 
 //------------------------------------------------------------------------------
 // Device funtionality
@@ -38,7 +49,7 @@ __global__ void d_setupneighbor(memory_t* memory,EdgeUpdate* edge_update_data,
     return;
   }
   
-  VertexData* vertices = (VertexDataType*)memory;
+  VertexData* vertices = (VertexData*)memory;
   
   edge_update_data[tid].neighbor = vertices[edge_update_data[tid].source].neighbours;
   //printf("edge_update_data[%d].source = %d\tneighbor = %d\n", tid, edge_update_data[tid].source, edge_update_data[tid].neighbor);
@@ -47,7 +58,7 @@ __global__ void d_setupneighbor(memory_t* memory,EdgeUpdate* edge_update_data,
 
 //------------------------------------------------------------------------------
 // @SH set 1 to every first different update source corresponding position
-__global__ void d_setupscanhelper(UpdateData* edge_update_data,
+__global__ void d_setupscanhelper(EdgeUpdate* edge_update_data,
   int batch_size, 
   index_t* scanhelper) 
 {
@@ -67,7 +78,7 @@ __global__ void d_setupscanhelper(UpdateData* edge_update_data,
 //------------------------------------------------------------------------------
 // @SH set workitem and thl_n thm_n th0
 __global__ void d_updateWorkItem(index_t edges_per_page, 
-  UpdateData* edge_update_data,
+  EdgeUpdate* edge_update_data,
   int batch_size, 
   memory_t* memory, 
   workitem* work, 
@@ -149,9 +160,10 @@ __global__ void d_duplicateCheckingInSortedBatch(EdgeUpdate* edge_update_data,
 //------------------------------------------------------------------------------
 // @SH check upate data duplicate in adjacency
 __global__ void d_process_kernel(MemoryManager* memory_manager,
-  UpdateDataType* UpdateData,
+  EdgeUpdate* UpdateData,
   workitem* work,
   index_t* pageindex,
+  index_t* pageindex_off,
   memory_t* memory,
   index_t* deletion_helper,
   int workoffset)
@@ -163,11 +175,11 @@ __global__ void d_process_kernel(MemoryManager* memory_manager,
   workitem temp = work[bid];
   if (temp.index == DELETIONMARKER) return;
 
-  /// compute pageindex related data
+  /// compute pageindex related data 
+  int tid = threadIdx.x;      
   int page_start = pageindex_off[tid];
   int page_num = pageindex_off[tid + 1] - page_start;
-  int edges_per_page = memory_manager->edges_per_page ; 
-  int tid = threadIdx.x;      
+  int edges_per_page = memory_manager->edges_per_page ;
 
  
   int st = temp.off;                      /// get update data index
@@ -213,12 +225,12 @@ void EdgeUpdateManager::setupPhrase(std::unique_ptr<MemoryManager>& memory_manag
     std::sort(updates->edge_update.begin(),updates->edge_update.end());
     HANDLE_ERROR(cudaMemcpy(updates->d_edge_update,
       updates->edge_update.data(),
-      sizeof(UpdateData) * batch_size,
+      sizeof(EdgeUpdate) * batch_size,
       cudaMemcpyHostToDevice));
   } else {
     // thrust sort
     thrust::device_ptr<EdgeUpdate> th_edge_updates(updates->d_edge_update);
-    thrust::sort(th_edge_updates, th_edge_updates + batch_size);   /// neighbor decreasing order source decreasing order destination increasing order
+    thrust::sort(th_edge_updates, th_edge_updates + batch_size, sortf());   /// neighbor decreasing order source decreasing order destination increasing order
   }
 }
 
@@ -273,6 +285,7 @@ void EdgeUpdateManager::edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<M
   const std::shared_ptr<Config>& config,
   const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed, 
   index_t* d_pageindex, 
+  index_t* d_pageindex_off,
   index_t* thm, 
   index_t* ths, 
   index_t* th0, 
@@ -334,6 +347,7 @@ void EdgeUpdateManager::edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<M
             updates->d_edge_update,
             preprocessed->d_different_vertexes,
             d_pageindex,
+            d_pageindex_off,
             memory_manager->d_data,
             deletehelp,
             h_th[i]);  

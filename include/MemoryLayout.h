@@ -42,7 +42,7 @@ struct EdgeUpdate
 	vertex_t source;
   	EdgeData update;
   	index_t neighbor;
-	friend __host__ __device__ bool operator<(const EdgeDataUpdate &lhs, const EdgeDataUpdate &rhs) 
+	friend __host__ __device__ bool operator<(const EdgeUpdate &lhs, const EdgeUpdate &rhs) 
 	{ 
 		if (lhs.neighbor == rhs.neighbor) {
 		return ((lhs.source > rhs.source) || (lhs.source == rhs.source && (lhs.update < rhs.update)));
@@ -56,24 +56,24 @@ struct EdgeUpdate
 //------------------------------------------------------------------------------
 //
 
-typedef struct VertexData
+struct VertexData
 {
 	int locking;
 	vertex_t mem_index;
 	vertex_t neighbours;
 	vertex_t capacity;
 	index_t host_identifier;
-}VertexData;
+};
 
 //------------------------------------------------------------------------------
 // VertexUpdate Variants for simple graphs
 //------------------------------------------------------------------------------
 //
 
-typedef struct VertexUpdate
+struct VertexUpdate
 {
 	index_t identifier;
-}VertexUpdate;
+};
 
 __forceinline__ __host__ __device__ bool operator<(const VertexUpdate &lhs, const VertexUpdate &rhs) { return (lhs.identifier < rhs.identifier); };
 

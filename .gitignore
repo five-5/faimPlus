@@ -34,3 +34,9 @@
 # vscode
 *.ipch
 *.bin
+*.json
+
+# others
+*.make
+*.cmake
+*.log

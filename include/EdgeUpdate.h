@@ -112,7 +112,7 @@ public:
 	std::unique_ptr<EdgeUpdateBatch> generateEdgeUpdates(vertex_t number_vertices, vertex_t batch_size, unsigned int seed, unsigned int range = 0, unsigned int offset = 0);
 	std::unique_ptr<EdgeUpdateBatch> generateEdgeUpdates(const std::unique_ptr<MemoryManager>& memory_manager, vertex_t batch_size, unsigned int seed, unsigned int range = 0, unsigned int offset = 0);
 	template <typename VertexUpdateType>
-	std::unique_ptr<EdgeUpdateBatch<EdgeUpdateType>> generateEdgeUpdatesConcurrent(std::unique_ptr<faimGraph>& faimGraph, const std::unique_ptr<MemoryManager>& memory_manager, vertex_t batch_size, unsigned int seed, unsigned int range = 0, unsigned int offset = 0);
+	std::unique_ptr<EdgeUpdateBatch> generateEdgeUpdatesConcurrent(std::unique_ptr<faimGraph>& faimGraph, const std::unique_ptr<MemoryManager>& memory_manager, vertex_t batch_size, unsigned int seed, unsigned int range = 0, unsigned int offset = 0);
 
 	void receiveEdgeUpdates(std::unique_ptr<EdgeUpdateBatch> updates, EdgeUpdateVersion type);
 	void hostCudaAllocConcurrentUpdates();
@@ -121,7 +121,7 @@ public:
 	// Edge Update Processing
 	std::unique_ptr<EdgeUpdatePreProcessing> edgeUpdatePreprocessing(std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config);
 	void edgeUpdateDuplicateChecking(std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed);
-	void edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed, index_t* d_pageindex, index_t* thm, index_t* ths, index_t* th0, index_t* deltehelp);
+	void edgeUpdateDuplicateCheckingByBlocksize(std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed, index_t* d_pageindex, index_t* d_pageindex_off, index_t* thm, index_t* ths, index_t* th0, index_t* deltehelp);
 	void updateWorkItem(std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, const std::unique_ptr<EdgeUpdatePreProcessing>& preprocessed, index_t* scanhelper, index_t* thm, index_t* ths, index_t* th0);
 	//void setupPhrase(std::unique_ptr<MemoryManager>& memory_manager, EdgeUpdateType* edge_update_data, int batch_size, int grid_size, int block_size);
 	void setupPhrase(std::unique_ptr<MemoryManager>& memory_manager, int batch_size, int grid_size, int block_size);
@@ -141,7 +141,7 @@ public:
 private:
 	// Interface for calling update kernel explicitely
 	void w_edgeInsertion(cudaStream_t& stream, const std::unique_ptr<EdgeUpdateBatch>& updates_insertion, std::unique_ptr<MemoryManager>& memory_manager, int batch_size, int block_size, int grid_size);
-	void w_edgeDeletion(cudaStream_t& stream, const std::unique_ptr<EdgeUpdateBatch>& updates_deletion, std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, int batch_size, int block_size, int grid_size);
+	// void w_edgeDeletion(cudaStream_t& stream, const std::unique_ptr<EdgeUpdateBatch>& updates_deletion, std::unique_ptr<MemoryManager>& memory_manager, const std::shared_ptr<Config>& config, int batch_size, int block_size, int grid_size);
 
 	std::unique_ptr<EdgeUpdateBatch> updates;
 	std::unique_ptr<EdgeUpdateBatch> updates_insertion;

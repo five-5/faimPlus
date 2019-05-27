@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// filename: faimGraph.cuh
+// filename: faimGraph.cu
 // Author : @SH
 // Date：2019.5.8
 //
@@ -173,7 +173,7 @@ namespace faimGraphGeneral
 		vertex_t edge_data_index = vertices[tid].mem_index;
 		vertex_t number_neighbours = vertices[tid].neighbours;
 		vertex_t edges_per_page = memory_manager->edges_per_page;
-		AdjacencyIterator<EdgeDataType> adjacency_iterator(pageAccess<EdgeDataType>(memory, edge_data_index, page_size, memory_manager->start_index));
+		AdjacencyIterator adjacency_iterator(pageAccess<EdgeDataType>(memory, edge_data_index, page_size, memory_manager->start_index));
 
 
 		// Write EdgeData
@@ -193,53 +193,6 @@ namespace faimGraphGeneral
 		return;
 	}
 
-	//------------------------------------------------------------------------------
-	//
-	template <typename EdgeDataType>
-	__global__ void d_faimGraphMatrixToCSR(MemoryManager* memory_manager,
-		memory_t* memory,
-		vertex_t* adjacency,
-		matrix_t* matrix_values,
-		vertex_t* offset,
-		int page_size,
-		vertex_t vertex_offset,
-		vertex_t number_vertices)
-	{
-		int tid = threadIdx.x + blockIdx.x*blockDim.x;
-		if (tid >= number_vertices)
-			return;
-
-		VertexData* vertices = (VertexData*)memory;
-
-		// Deleted vertices
-		if (vertices[vertex_offset + tid].host_identifier == DELETIONMARKER)
-		{
-			return;
-		}
-
-		// Retrieve data
-		vertex_t edge_data_index = vertices[vertex_offset + tid].mem_index;
-		vertex_t number_neighbours = vertices[vertex_offset + tid].neighbours;
-		vertex_t edges_per_page = memory_manager->edges_per_page;
-		AdjacencyIterator<EdgeDataMatrix> adjacency_iterator(pageAccess<EdgeDataMatrix>(memory, edge_data_index, page_size, memory_manager->start_index));
-
-		// Write EdgeData
-		int offset_index = offset[tid];
-		for (int i = 0, j = 0; j < number_neighbours; ++i)
-		{
-			// Normal case
-			EdgeDataMatrix adj_dest = adjacency_iterator.getElement();
-			if (adj_dest.destination != DELETIONMARKER)
-			{
-				adjacency[offset_index + j] = adj_dest.destination;
-				matrix_values[offset_index + j] = adj_dest.matrix_value;
-				j += 1;
-			}
-			adjacency_iterator.advanceIterator(i, edges_per_page, memory, page_size, memory_manager->start_index);
-		}
-
-		return;
-	}
 
 	//------------------------------------------------------------------------------
 	//

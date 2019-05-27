@@ -37,8 +37,9 @@ namespace faimGraphEdgeInsertion
 			return;	
 		}
 	
-		VertexData* vertices = (VertexData*)memory;									
-		pageindex_off[tid] = (vertices.neighbour + pageindexes_per_page - 1) / pageindexes_per_page; 
+		VertexData* vertices = (VertexData*)memory;	
+		vertex_t neighbours = vertices->neighbours;								
+		pageindex_off[tid] = ( neighbours + pageindexes_per_page - 1) / pageindexes_per_page; 
 		
 	}
 
@@ -60,11 +61,11 @@ namespace faimGraphEdgeInsertion
 		VertexData* vertices = (VertexData*)memory;	
 		int begin = pageindex_off[tid];								
 		int offset = pageindex_off[tid + 1] - begin;
-		index_t pageindex = vertices[tid].mem_index;
+		index_t cur_pageindex = vertices[tid].mem_index;
 		for (int i = 0; i < offset; ++i) {
-			PageIndexIterator pageindex_iterator(pageAccess<index_t>(memory, pageindex, page_size, memory_manager->start_page_index));
-			pageindex[begin + i] = pageindex;
-			pageindex = pageindex_iterator.getPageIndexNext(pageindexes_per_page);
+			PageIndexIterator pageindex_iterator(pageAccess<index_t>(memory, cur_pageindex, memory_manager->page_size, memory_manager->start_page_index));
+			pageindex[begin + i] = cur_pageindex;
+			cur_pageindex = pageindex_iterator.getPageIndexNext(pageindexes_per_page);
 		}
 
 	}
@@ -100,7 +101,7 @@ namespace faimGraphEdgeInsertion
 
 	//------------------------------------------------------------------------------
 	// d_calcPageindexCapacity
-	__forceinline__ __device__ index_t d_calcPageindexCapacity(vertex_t capacity, vertex_t edges_per_page, vertex_t pageindexes_per_page,)
+	__forceinline__ __device__ index_t d_calcPageindexCapacity(vertex_t capacity, vertex_t edges_per_page, vertex_t pageindexes_per_page)
 	{
 		return ( capacity / edges_per_page + pageindexes_per_page - 1 ) / pageindexes_per_page * pageindexes_per_page;
 	}
@@ -129,14 +130,14 @@ namespace faimGraphEdgeInsertion
 		index_t src = work[tid].index;
 		vertex_t edges_per_page = memory_manager->edges_per_page;
 		vertex_t pageindexes_per_page = memory_manager->pageindexes_per_page;
-		EdgeUpdate* vertices = (EdgeUpdate*)memory;
+		VertexData* vertices = (VertexData*)memory;
 		int neighbours = vertices[src].neighbours;
 		int capacity = vertices[src].capacity;
 		int pageindex_numbers = neighbours / edges_per_page;
 		int pageindex_capacity = d_calcPageindexCapacity(capacity, edges_per_page, pageindexes_per_page);
 
 		
-		PageIndexIterator pageindex_iterator(pageAccess<EdgeData>(memory, vertices[src].mem_index, page_size, memory_manager->start_page_index));
+		PageIndexIterator pageindex_iterator(pageAccess<index_t>(memory, vertices[src].mem_index, page_size, memory_manager->start_page_index));
 		index_t fresh_pageindex_position = pageindex_numbers;
 		index_t fresh_position = neighbours - (pageindex_numbers - 1) * edges_per_page;
 		
@@ -185,7 +186,7 @@ namespace faimGraphEdgeInsertion
 				/// set the rest of the pageindex to DELETIONMARKERS
 				while (number_pageindexes < d_calcPageindexCapacity(capacity, edges_per_page, pageindexes_per_page))
 				{
-					(index_t)*pageindex_iterator = DELETIONMARKER;
+					setPageIndexDeletionMarker(pageindex_iterator.getIterator(), pageindexes_per_page);
 					++pageindex_iterator;
 					++number_pageindexes;
 				}
@@ -203,13 +204,13 @@ namespace faimGraphEdgeInsertion
 				adjacency_iterator.setIterator(pageAccess<EdgeData>(memory, *edge_block_index_ptr, page_size, memory_manager->start_index));
 				capacity += edges_per_page;
 
-				if (pageindex_iterator.pageIsFull()) {
+				if (pageindex_iterator.pageIsFull(memory_manager->pageindexes_per_page, memory_manager->start_page_index)) {
 					
 					index_t* pageindex_block_index_ptr = pageindex_iterator.getPageIndexPtr(pageindexes_per_page);
 					d_pageAllocate(memory_manager, edge_block_index_ptr, PAGETYPE::PAGEINDEX);
 					pageindex_iterator.setIterator(pageAccess<index_t>(memory, *pageindex_block_index_ptr, page_size, memory_manager->start_page_index));
 				} else {
-					*pageindex_iterator = *edge_block_index_ptr;
+					updatePageIndex(pageindex_iterator.getIterator(), *edge_block_index_ptr);
 					++pageindex_iterator;
 				}
 			}
@@ -241,21 +242,21 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 	float time_insert = 0;
 	float time_diff = 0;
 	cudaEvent_t in_start, in_stop;
-	printf("vc:time_setup: %f |time_preprocess: %f |time_update: %f | time_scanwork: %f |time_pageindex: %f |time_check: %f | time_insert: %f\n", time_setup, time_preprocess, time_update, time_scanwork, time_pageindex, time_check, time_insert);
+	
 	int batch_size = updates->edge_update.size();
 	int block_size = config->testruns_.at(config->testrun_index_)->params->insert_launch_block_size_;
 	int grid_size = (batch_size / block_size) + 1;
 
 	/// allocate batch_size in memorymanager [decrease free memory]
-	ScopedMemoryAccessHelper scoped_mem_access_counter(memory_manager.get(), sizeof(UpdateData) *  batch_size);
+	ScopedMemoryAccessHelper scoped_mem_access_counter(memory_manager.get(), sizeof(EdgeUpdate) *  batch_size);
 
 	// Copy updates to device
 	TemporaryMemoryAccessHeap temp_memory_dispenser(memory_manager.get(), memory_manager->next_free_vertex_index, sizeof(VertexData));
-	updates->d_edge_update = temp_memory_dispenser.getTemporaryMemory<UpdateData>(batch_size);  /// return the location next_free_vertex with batch_size  
+	updates->d_edge_update = temp_memory_dispenser.getTemporaryMemory<EdgeUpdate>(batch_size);  /// return the location next_free_vertex with batch_size  
 
 	HANDLE_ERROR(cudaMemcpy(updates->d_edge_update,
 		updates->edge_update.data(),
-		sizeof(UpdateData) * batch_size,
+		sizeof(EdgeUpdate) * batch_size,
 		cudaMemcpyHostToDevice));
 	
 	/// allocate deletehelp	
@@ -406,7 +407,7 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 		printf("duplicateCheckingByBlockSize\n");
 		start_clock(in_start, in_stop);
 		/// edgeUpdateDuplicateCheckingByBlocksize: check duplicate in batch and adjacency
-			edgeUpdateDuplicateCheckingByBlocksize(memory_manager, config, preprocessed, d_pageindex, thm, ths, th0, deletehelp);
+			edgeUpdateDuplicateCheckingByBlocksize(memory_manager, config, preprocessed, d_pageindex, d_pageindex_off, thm, ths, th0, deletehelp);
 		time_diff = end_clock(in_start, in_stop);
 		time_check += time_diff;
 		
@@ -424,7 +425,7 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 		time_diff = end_clock(in_start, in_stop);
 		time_insert += time_diff;
 	
-		printf("vc:time_setup: %f |time_preprocess: %f |time_update: %f | time_scanwork: %f |time_pageindex: %f |time_check: %f | time_insert: %f\n", time_setup, time_preprocess, time_update, time_scanwork, time_pageindex, time_check, time_insert);
+		printf("vc:time_setup: %f |time_preprocess: %f |time_scanhelper: %f | time_update_workitem: %f |time_pageindex_off: %f |time_pageindex: %f |time_check: %f | time_insert: %f\n", time_setup, time_preprocess, time_scanhelper, time_update_workitem, time_pageindex_off, time_pageindex, time_check, time_insert);
 	}
 	
 	updateMemoryManagerHost(memory_manager);
@@ -435,27 +436,7 @@ void EdgeUpdateManager::deviceEdgeInsertion(std::unique_ptr<MemoryManager>& memo
 
 //------------------------------------------------------------------------------
 // √
-template <typename VertexDataType, typename VertexUpdateType, typename EdgeDataType, typename EdgeUpdateType>
-void faimGraph<VertexDataType, VertexUpdateType, EdgeDataType, EdgeUpdateType>::edgeInsertion()
+void faimGraph::edgeInsertion()
 {
 	edge_update_manager->deviceEdgeInsertion(memory_manager, config);
-}
-
-//------------------------------------------------------------------------------
-//
-template <typename VertexDataType, typename EdgeDataType, typename UpdateDataType>
-void EdgeUpdateManager<VertexDataType, EdgeDataType, UpdateDataType>::w_edgeInsertion(cudaStream_t& stream,
-	const std::unique_ptr<EdgeUpdateBatch<UpdateDataType>>& updates_insertion,
-	std::unique_ptr<MemoryManager>& memory_manager,
-	int batch_size,
-	int block_size,
-	int grid_size)
-{
-	faimGraphEdgeInsertion::d_edgeInsertion<VertexDataType, EdgeDataType, UpdateDataType> << < grid_size, block_size, 0, stream >> > ((MemoryManager*)memory_manager->d_memory,
-		memory_manager->d_data,
-		memory_manager->page_size,
-		updates_insertion->d_edge_update,
-		batch_size);
-
-	updateMemoryManagerHost(memory_manager);
 }

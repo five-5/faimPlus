@@ -53,7 +53,7 @@ void printCUDAStats(const std::string& init_string)
 // declaration of func
 void testrunImplementation(const std::shared_ptr<Config>& config, const std::unique_ptr<Testruns>& testrun);
 
-void verification(std::unique_ptr<faimGraph>& faimGraph, std::unique_ptr<EdgeUpdateManager>& edge_update_manager, const std::string& outputstring, std::unique_ptr<MemoryManager>& memory_manager, std::unique_ptr<GraphParser>& parser, const std::unique_ptr<Testruns>& testrun, int round, int updateround, bool gpuVerification, bool insertion, bool duplicate_check);
+// void verification(std::unique_ptr<faimGraph>& faimGraph, std::unique_ptr<EdgeUpdateManager>& edge_update_manager, const std::string& outputstring, std::unique_ptr<MemoryManager>& memory_manager, std::unique_ptr<GraphParser>& parser, const std::unique_ptr<Testruns>& testrun, int round, int updateround, bool gpuVerification, bool insertion, bool duplicate_check);
 
 
 int main(int argc, char* argv[])
@@ -207,75 +207,24 @@ void testrunImplementation(const std::shared_ptr<Config>& config, const std::uni
 					if (i >= warmup_rounds)
 						time_elapsed_edgeinsertion += time_diff;
 
-					if (testrun->params->verification_)
-					{
-						if (writeToFile)
-						{
-							std::string filename;
-							if (((i * testrun->params->rounds_) + j) < 10)
-							{
-								filename = "../tests/Verification/edgeupdatesinsert0" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
-							}
-							else
-							{
-								filename = "../tests/Verification/edgeupdatesinsert" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
-							}
-							faimGraph->edge_update_manager->writeEdgeUpdatesToFile(edge_updates, batchsize, filename);
-						}
+					// if (testrun->params->verification_)
+					// {
+					// 	if (writeToFile)
+					// 	{
+					// 		std::string filename;
+					// 		if (((i * testrun->params->rounds_) + j) < 10)
+					// 		{
+					// 			filename = "../tests/Verification/edgeupdatesinsert0" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
+					// 		}
+					// 		else
+					// 		{
+					// 			filename = "../tests/Verification/edgeupdatesinsert" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
+					// 		}
+					// 		faimGraph->edge_update_manager->writeEdgeUpdatesToFile(edge_updates, batchsize, filename);
+					// 	}
 
-						verification (faimGraph, faimGraph->edge_update_manager, "Verify Insertion Round", faimGraph->memory_manager, parser, testrun, i, j, gpuVerification, true, duplicate_check);
-					}
-
-					//------------------------------------------------------------------------------
-					// Edge Deletion phase
-					//------------------------------------------------------------------------------
-					//
-					std::unique_ptr<EdgeUpdateBatch> realistic_edge_updates;
-					if (realisticDeletion)
-					{
-						// Generate Edge deletion updates randomly from graph data
-						//realistic_edge_updates = aimGraph->edge_update_manager->generateEdgeUpdates(aimGraph->memory_manager, batchsize, (i * testrun->params->rounds_) + j);
-						realistic_edge_updates = faimGraph->edge_update_manager->generateEdgeUpdates(faimGraph->memory_manager, batchsize, (i * testrun->params->rounds_) + j, range, offset);
-						faimGraph->edge_update_manager->receiveEdgeUpdates(std::move(realistic_edge_updates), EdgeUpdateVersion::GENERAL);
-					}
-
-					start_clock(ce_start, ce_stop);
-
-					faimGraph->edgeDeletion();
-
-					time_diff = end_clock(ce_start, ce_stop);
-					if (i >= warmup_rounds)
-						time_elapsed_edgedeletion += time_diff;
-
-					//------------------------------------------------------------------------------
-					// Verification phase
-					//------------------------------------------------------------------------------
-					//
-					if (testrun->params->verification_)
-					{
-						if (realisticDeletion)
-						{
-							if (writeToFile)
-							{
-								std::string filename;
-								if (((i * testrun->params->rounds_) + j) < 10)
-								{
-									filename = "../tests/Verification/edgeupdatesdelete0" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
-								}
-								else
-								{
-									filename = "../tests/Verification/edgeupdatesdelete" + std::to_string((i * testrun->params->rounds_) + j) + ".txt";
-								}
-								faimGraph->edge_update_manager->writeEdgeUpdatesToFile(realistic_edge_updates, batchsize, filename);
-							}
-
-							verification (faimGraph, faimGraph->edge_update_manager, "Verify Deletion Round", faimGraph->memory_manager, parser, testrun, i, j, gpuVerification, false, duplicate_check);
-						}
-						else
-						{
-							verification (faimGraph, faimGraph->edge_update_manager, "Verify Deletion Round", faimGraph->memory_manager, parser, testrun, i, j, gpuVerification, false, duplicate_check);
-						}
-					}
+					// 	verification (faimGraph, faimGraph->edge_update_manager, "Verify Insertion Round", faimGraph->memory_manager, parser, testrun, i, j, gpuVerification, true, duplicate_check);
+					// }
 				}
 
 				// Let's retrieve a fresh graph
@@ -317,53 +266,53 @@ void testrunImplementation(const std::shared_ptr<Config>& config, const std::uni
 
 //------------------------------------------------------------------------------
 //
-void verification(std::unique_ptr<faimGraph>& faimGraph,
-	std::unique_ptr<EdgeUpdateManager>& edge_update_manager,
-	const std::string& outputstring,
-	std::unique_ptr<MemoryManager>& memory_manager,
-	std::unique_ptr<GraphParser>& parser,
-	const std::unique_ptr<Testruns>& testrun,
-	int round,
-	int updateround,
-	bool gpuVerification,
-	bool insertion,
-	bool duplicate_check)
-{
-	std::cout << "############ " << outputstring << " " << (round * testrun->params->rounds_) + updateround << " ############" << std::endl;
-	std::unique_ptr<aimGraphCSR> verify_graph = faimGraph->verifyGraphStructure(memory_manager);
-	// Update host graph
-	if (insertion)
-	{
-		edge_update_manager->hostEdgeInsertion(parser);
-	}
-	else
-	{
-		edge_update_manager->hostEdgeDeletion(parser);
-	}
+// void verification(std::unique_ptr<faimGraph>& faimGraph,
+// 	std::unique_ptr<EdgeUpdateManager>& edge_update_manager,
+// 	const std::string& outputstring,
+// 	std::unique_ptr<MemoryManager>& memory_manager,
+// 	std::unique_ptr<GraphParser>& parser,
+// 	const std::unique_ptr<Testruns>& testrun,
+// 	int round,
+// 	int updateround,
+// 	bool gpuVerification,
+// 	bool insertion,
+// 	bool duplicate_check)
+// {
+// 	std::cout << "############ " << outputstring << " " << (round * testrun->params->rounds_) + updateround << " ############" << std::endl;
+// 	std::unique_ptr<aimGraphCSR> verify_graph = faimGraph->verifyGraphStructure(memory_manager);
+// 	// Update host graph
+// 	if (insertion)
+// 	{
+// 		edge_update_manager->hostEdgeInsertion(parser);
+// 	}
+// 	else
+// 	{
+// 		edge_update_manager->hostEdgeDeletion(parser);
+// 	}
 
-	std::string filename;
-	if (((round * testrun->params->rounds_) + updateround) < 10)
-	{
-		filename = "../tests/Verification/graphverification" + outputstring + "0" + std::to_string((round * testrun->params->rounds_) + updateround) + ".txt";
-	}
-	else
-	{
-		filename = "../tests/Verification/graphverification" + outputstring + std::to_string((round * testrun->params->rounds_) + updateround) + ".txt";
-	}
-	edge_update_manager->writeGraphsToFile(verify_graph, parser, filename);
+// 	std::string filename;
+// 	if (((round * testrun->params->rounds_) + updateround) < 10)
+// 	{
+// 		filename = "../tests/Verification/graphverification" + outputstring + "0" + std::to_string((round * testrun->params->rounds_) + updateround) + ".txt";
+// 	}
+// 	else
+// 	{
+// 		filename = "../tests/Verification/graphverification" + outputstring + std::to_string((round * testrun->params->rounds_) + updateround) + ".txt";
+// 	}
+// 	edge_update_manager->writeGraphsToFile(verify_graph, parser, filename);
 
 
-	// Compare graph structures
-	if (gpuVerification)
-	{
-		if (!faimGraph->compareGraphs(parser, verify_graph, duplicate_check))
-		{
-			std::cout << "########## Graphs are NOT the same ##########" << std::endl;
-			exit(-1);
-		}
-	}
-	else
-	{
-		edge_update_manager->writeGraphsToFile(verify_graph, parser, "../tests/Verification/graphverification");
-	}
-}
+// 	// Compare graph structures
+// 	if (gpuVerification)
+// 	{
+// 		if (!faimGraph->compareGraphs(parser, verify_graph, duplicate_check))
+// 		{
+// 			std::cout << "########## Graphs are NOT the same ##########" << std::endl;
+// 			exit(-1);
+// 		}
+// 	}
+// 	else
+// 	{
+// 		edge_update_manager->writeGraphsToFile(verify_graph, parser, "../tests/Verification/graphverification");
+// 	}
+// }

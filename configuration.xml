@@ -1,0 +1,37 @@
+<aimGraph>
+	<global>
+		<deviceID>3</deviceID>
+		<devicememsize>4.0</devicememsize>
+	</global>
+	<testrun>
+		<configuration>
+			<memorylayout>AOS</memorylayout>
+			<graphmode>simple</graphmode>
+			<updatevariant>vertexcentric</updatevariant>
+			<rounds>3</rounds>
+			<updaterounds>1</updaterounds>
+			<edgeblocksize>64</edgeblocksize>
+			<initlaunchblocksize>32</initlaunchblocksize>
+			<insertlaunchblocksize>256</insertlaunchblocksize>
+			<deletelaunchblocksize>256</deletelaunchblocksize>
+			<deletionvariation>standard</deletionvariation>
+			<verification>false</verification>
+			<performanceoutput>stdout</performanceoutput>
+			<memoryoverallocation>1.0</memoryoverallocation>
+			<stacksize>200000000</stacksize>
+			<queuesize>2000000</queuesize>
+			<directionality>undirected</directionality>
+			<pagesize>64</pagesize>
+		</configuration>
+		<graphs>
+		  <filename>../../../graphs/soc_shuffle.graph</filename>
+		</graphs>
+		<batches>
+			<batchsize>100</batchsize>
+			<batchsize>1000</batchsize>
+			<batchsize>10000</batchsize>
+			<batchsize>100000</batchsize>
+			<batchsize>1000000</batchsize>
+		</batches>
+	</testrun>
+</aimGraph>
